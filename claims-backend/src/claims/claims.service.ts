@@ -5,6 +5,7 @@ import { ClaimEntity } from '../engine/entities/claim.entity';
 import { Claim, CreateClaimDto, TransitionClaimDto, TransitionResult } from '../engine/types';
 import { WorkflowEngineService } from '../engine/workflow-engine.service';
 import { AuditTrailService } from '../engine/audit-trail.service';
+import { ClaimState, SYSTEM_USER } from '../engine/constants';
 import * as crypto from 'crypto';
 
 @Injectable()
@@ -34,7 +35,7 @@ export class ClaimsService {
       // 1. Create and save claim row
       const newClaim = transactionalEntityManager.create(ClaimEntity, {
         claimId,
-        currentState: 'SUBMITTED',
+        currentState: ClaimState.SUBMITTED,
         cycleCount: 0,
         metadata: dto.metadata || {},
       });
@@ -45,8 +46,8 @@ export class ClaimsService {
       await this.auditTrailService.create(
         claimId,
         null, // fromState is null on creation
-        'SUBMITTED',
-        { userId: 'system_creator', role: 'system' },
+        ClaimState.SUBMITTED,
+        SYSTEM_USER,
         'Initial claim submission',
         dto.metadata || {},
       );

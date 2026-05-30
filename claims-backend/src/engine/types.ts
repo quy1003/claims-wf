@@ -1,6 +1,8 @@
+import { PreconditionOperator } from './constants';
+
 export interface BasePrecondition {
   field?: string;
-  operator: 'equals' | 'notEmpty' | 'lessThanOrEqualField' | 'or';
+  operator: PreconditionOperator;
   value?: any;
   compareField?: string;
   conditions?: BasePrecondition[];

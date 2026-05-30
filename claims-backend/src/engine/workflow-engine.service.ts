@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException, ForbiddenException, OnModuleInit } from '@nestjs/common';
 import { BasePrecondition, Claim, TransitionConfig, TransitionResult, WorkflowConfig, TriggeredBy } from './types';
 import { AuditTrailService } from './audit-trail.service';
+import { ClaimState, PreconditionOperator, MAX_INFO_REQUEST_CYCLES } from './constants';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -51,7 +52,7 @@ export class WorkflowEngineService implements OnModuleInit {
 
     // Find allowed transitions from the current state
     const allowedTransitions = this.config.transitions.filter(
-      (t) => t.from === currentState,
+      (transition) => transition.from === currentState,
     );
 
     if (allowedTransitions.length === 0) {
@@ -59,9 +60,9 @@ export class WorkflowEngineService implements OnModuleInit {
     }
 
     // Find the specific transition to the target state
-    const transition = allowedTransitions.find((t) => t.to === toState);
+    const transition = allowedTransitions.find((transition) => transition.to === toState);
     if (!transition) {
-      const availableToStates = allowedTransitions.map((t) => t.to).join(', ');
+      const availableToStates = allowedTransitions.map((transition) => transition.to).join(', ');
       throw new BadRequestException(
         `Invalid transition: cannot go directly from "${currentState}" to "${toState}". ` +
         `Available states to transition to are: [${availableToStates}]`,
@@ -77,8 +78,8 @@ export class WorkflowEngineService implements OnModuleInit {
     }
 
     // Check Cycle Limit for UNDER_ASSESSMENT -> PENDING_INFO loop
-    if (currentState === 'UNDER_ASSESSMENT' && toState === 'PENDING_INFO') {
-      if (claim.cycleCount >= 3) {
+    if (currentState === ClaimState.UNDER_ASSESSMENT && toState === ClaimState.PENDING_INFO) {
+      if (claim.cycleCount >= MAX_INFO_REQUEST_CYCLES) {
         throw new BadRequestException(
           'Maximum information requests exceeded — escalate to team lead',
         );
@@ -124,7 +125,7 @@ export class WorkflowEngineService implements OnModuleInit {
     };
 
     // If returning from UNDER_ASSESSMENT to PENDING_INFO, increment cycle count
-    if (fromState === 'UNDER_ASSESSMENT' && toState === 'PENDING_INFO') {
+    if (fromState === ClaimState.UNDER_ASSESSMENT && toState === ClaimState.PENDING_INFO) {
       claim.cycleCount += 1;
       claim.metadata.cycleCount = claim.cycleCount;
     }
@@ -154,11 +155,8 @@ export class WorkflowEngineService implements OnModuleInit {
     };
   }
 
-  /**
-   * Evaluates a precondition recursively.
-   */
   private evaluatePrecondition(condition: BasePrecondition, context: Record<string, any>): boolean {
-    if (condition.operator === 'or') {
+    if (condition.operator === PreconditionOperator.OR) {
       if (!condition.conditions || condition.conditions.length === 0) {
         return false;
       }
@@ -173,11 +171,11 @@ export class WorkflowEngineService implements OnModuleInit {
     const fieldValue = context[field];
 
     switch (operator) {
-      case 'equals':
+      case PreconditionOperator.EQUALS:
         return fieldValue === value;
-      case 'notEmpty':
+      case PreconditionOperator.NOT_EMPTY:
         return fieldValue !== undefined && fieldValue !== null && fieldValue !== '';
-      case 'lessThanOrEqualField': {
+      case PreconditionOperator.LESS_THAN_OR_EQUAL_FIELD: {
         if (!compareField) return false;
         const compareValue = context[compareField];
         if (fieldValue === undefined || compareValue === undefined) return false;

@@ -42,11 +42,11 @@ export class ClaimsController {
 
     // Query state transitions available from the current state
     const availableTransitions = config.transitions
-      .filter((t) => t.from === claim.currentState)
-      .map((t) => ({
-        to: t.to,
-        authorizedRoles: t.authorizedRoles,
-        preconditions: t.preconditions,
+      .filter((transition) => transition.from === claim.currentState)
+      .map((transition) => ({
+        to: transition.to,
+        authorizedRoles: transition.authorizedRoles,
+        preconditions: transition.preconditions,
       }));
 
     return {
