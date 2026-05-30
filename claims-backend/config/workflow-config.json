@@ -1,0 +1,160 @@
+{
+  "states": {
+    "SUBMITTED": "Claim received, awaiting document verification",
+    "DOCUMENTS_VERIFIED": "All required documents confirmed present and valid",
+    "UNDER_ASSESSMENT": "Assessor is reviewing the claim",
+    "PENDING_INFO": "Additional information requested from member",
+    "APPROVED": "Claim approved for payment",
+    "REJECTED": "Claim denied",
+    "PAYMENT_INITIATED": "Payment processing started",
+    "CLOSED": "Claim lifecycle complete"
+  },
+  "transitions": [
+    {
+      "from": "SUBMITTED",
+      "to": "DOCUMENTS_VERIFIED",
+      "authorizedRoles": ["document_clerk"],
+      "preconditions": [
+        {
+          "field": "allDocumentsPresent",
+          "operator": "equals",
+          "value": true,
+          "errorMessage": "All required documents must be present"
+        }
+      ],
+      "sideEffects": ["notifyAssessorTeam"]
+    },
+    {
+      "from": "DOCUMENTS_VERIFIED",
+      "to": "UNDER_ASSESSMENT",
+      "authorizedRoles": ["team_lead"],
+      "preconditions": [
+        {
+          "field": "assessorAssigned",
+          "operator": "equals",
+          "value": true,
+          "errorMessage": "An assessor must be assigned to the claim"
+        }
+      ],
+      "sideEffects": ["logAssessmentStartTime"]
+    },
+    {
+      "from": "UNDER_ASSESSMENT",
+      "to": "APPROVED",
+      "authorizedRoles": ["assessor"],
+      "preconditions": [
+        {
+          "field": "assessmentReportComplete",
+          "operator": "equals",
+          "value": true,
+          "errorMessage": "The assessment report must be complete"
+        },
+        {
+          "field": "claimAmount",
+          "operator": "lessThanOrEqualField",
+          "compareField": "policyLimit",
+          "errorMessage": "The claim amount must not exceed the policy limit"
+        }
+      ],
+      "sideEffects": ["notifyMemberOfApproval", "createPaymentRequest"]
+    },
+    {
+      "from": "UNDER_ASSESSMENT",
+      "to": "REJECTED",
+      "authorizedRoles": ["assessor"],
+      "preconditions": [
+        {
+          "field": "assessmentReportComplete",
+          "operator": "equals",
+          "value": true,
+          "errorMessage": "The assessment report must be complete"
+        },
+        {
+          "field": "rejectionReason",
+          "operator": "notEmpty",
+          "errorMessage": "A rejection reason must be provided"
+        }
+      ],
+      "sideEffects": ["notifyMemberOfRejectionWithAppealInstructions"]
+    },
+    {
+      "from": "UNDER_ASSESSMENT",
+      "to": "PENDING_INFO",
+      "authorizedRoles": ["assessor"],
+      "preconditions": [
+        {
+          "field": "missingInfoDescription",
+          "operator": "notEmpty",
+          "errorMessage": "A description of the missing information must be provided"
+        }
+      ],
+      "sideEffects": ["notifyMemberOfMissingInfoRequest"]
+    },
+    {
+      "from": "PENDING_INFO",
+      "to": "DOCUMENTS_VERIFIED",
+      "authorizedRoles": ["document_clerk"],
+      "preconditions": [
+        {
+          "field": "newInfoReceived",
+          "operator": "equals",
+          "value": true,
+          "errorMessage": "New documents or info must be received"
+        }
+      ],
+      "sideEffects": ["resetAssessmentTimer"]
+    },
+    {
+      "from": "APPROVED",
+      "to": "PAYMENT_INITIATED",
+      "authorizedRoles": ["finance"],
+      "preconditions": [
+        {
+          "field": "paymentRequestCreated",
+          "operator": "equals",
+          "value": true,
+          "errorMessage": "A payment request must have been created"
+        }
+      ],
+      "sideEffects": ["triggerPaymentSystem"]
+    },
+    {
+      "from": "PAYMENT_INITIATED",
+      "to": "CLOSED",
+      "authorizedRoles": ["finance"],
+      "preconditions": [
+        {
+          "field": "paymentConfirmed",
+          "operator": "equals",
+          "value": true,
+          "errorMessage": "The payment must be confirmed"
+        }
+      ],
+      "sideEffects": ["notifyMemberWithPaymentReference"]
+    },
+    {
+      "from": "REJECTED",
+      "to": "CLOSED",
+      "authorizedRoles": ["system"],
+      "preconditions": [
+        {
+          "operator": "or",
+          "conditions": [
+            {
+              "field": "appealPeriodExpired",
+              "operator": "equals",
+              "value": true
+            },
+            {
+              "field": "memberAcknowledged",
+              "operator": "equals",
+              "value": true
+            }
+          ],
+          "errorMessage": "The appeal period must have expired OR the member must have acknowledged the rejection"
+        }
+      ],
+      "sideEffects": ["archiveClaim"]
+    }
+  ]
+}
