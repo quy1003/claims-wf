@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { ClaimEntity } from '../engine/entities/claim.entity';
-import { Claim, CreateClaimDto, TransitionClaimDto, TransitionResult } from '../engine/types';
+import { Claim, CreateClaimDto, TransitionClaimDto, TransitionResult, TriggeredBy } from '../engine/types';
 import { WorkflowEngineService } from '../engine/workflow-engine.service';
 import { AuditTrailService } from '../engine/audit-trail.service';
 import { ClaimState, SYSTEM_USER } from '../engine/constants';
@@ -22,7 +22,7 @@ export class ClaimsService {
    * Create a new claim in database.
    * Runs in an atomic transaction to ensure claim row and initial audit entry are created together.
    */
-  async create(dto: CreateClaimDto): Promise<Claim> {
+  async create(dto: CreateClaimDto, user: TriggeredBy = SYSTEM_USER): Promise<Claim> {
     const claimId = dto.claimId || `CLM-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
 
     // Verify if claim ID is already allocated
@@ -47,7 +47,7 @@ export class ClaimsService {
         claimId,
         null, // fromState is null on creation
         ClaimState.SUBMITTED,
-        SYSTEM_USER,
+        user,
         'Initial claim submission',
         dto.metadata || {},
       );
@@ -81,7 +81,7 @@ export class ClaimsService {
    * Transition a claim's state using an atomic database transaction.
    * If any step (precondition fail, role check, cycle limit) throws an error, the transaction rolls back.
    */
-  async transition(claimId: string, dto: TransitionClaimDto): Promise<TransitionResult> {
+  async transition(claimId: string, dto: TransitionClaimDto, user?: TriggeredBy): Promise<TransitionResult> {
     return await this.dataSource.transaction(async (transactionalEntityManager) => {
       // Fetch claim row inside the transaction
       const claimEntity = await transactionalEntityManager.findOne(ClaimEntity, {
@@ -94,11 +94,13 @@ export class ClaimsService {
 
       const claim = this.mapToDto(claimEntity);
 
+      const caller: TriggeredBy = user || { userId: dto.userId!, role: dto.role! };
+
       // Run transition checks via the state engine (persists the audit log in the database)
       const result = await this.workflowEngine.executeTransition(
         claim,
         dto.toState,
-        { userId: dto.userId, role: dto.role },
+        caller,
         dto.reason,
         dto.context || {},
       );

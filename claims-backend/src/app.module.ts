@@ -6,8 +6,11 @@ import { AppService } from './app.service';
 import { EngineModule } from './engine/engine.module';
 import { ClaimsModule } from './claims/claims.module';
 import { ScenariosModule } from './scenarios/scenarios.module';
+import { AuthModule } from './auth/auth.module';
 import { ClaimEntity } from './engine/entities/claim.entity';
 import { AuditLogEntity } from './engine/entities/audit-log.entity';
+import { UserEntity } from './engine/entities/user.entity';
+import { validate } from './common/env.validation';
 
 @Module({
   imports: [
@@ -15,6 +18,7 @@ import { AuditLogEntity } from './engine/entities/audit-log.entity';
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
+      validate,
     }),
     
     // Asynchronous TypeORM Configuration for MySQL
@@ -28,12 +32,13 @@ import { AuditLogEntity } from './engine/entities/audit-log.entity';
         username: configService.get<string>('DB_USERNAME', 'root'),
         password: configService.get<string>('DB_PASSWORD', ''),
         database: configService.get<string>('DB_DATABASE', 'claims_db'),
-        entities: [ClaimEntity, AuditLogEntity],
+        entities: [ClaimEntity, AuditLogEntity, UserEntity],
         synchronize: true, // Automatically synchronize database schemas for rapid setup
       }),
     }),
     
     EngineModule,
+    AuthModule,
     ClaimsModule,
     ScenariosModule,
   ],

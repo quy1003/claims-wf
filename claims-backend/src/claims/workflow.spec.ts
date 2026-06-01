@@ -515,4 +515,31 @@ describe('WorkflowEngine & ClaimsService Integration Suite', () => {
     const allLogs = await auditTrailService.findAll();
     expect(allLogs[0]).not.toBe(logs[0]); // Decoupled clone copies
   });
+
+  // Test 17: Configuration Validation for Side Effects
+  it('should throw an error during onModuleInit if workflow configuration has invalid side effects', () => {
+    const serviceWithInvalidConfig = new WorkflowEngineService(auditTrailService);
+    
+    // Stub fs.readFileSync to return an invalid configuration with unrecognized side effect
+    const invalidConfig = {
+      states: { SUBMITTED: 'Submitted', CLOSED: 'Closed' },
+      transitions: [
+        {
+          from: 'SUBMITTED',
+          to: 'CLOSED',
+          authorizedRoles: ['system'],
+          preconditions: [],
+          sideEffects: ['nonExistentSideEffect'], // Invalid!
+        },
+      ],
+    };
+
+    jest.spyOn(require('fs'), 'readFileSync').mockReturnValue(JSON.stringify(invalidConfig));
+
+    expect(() => {
+      serviceWithInvalidConfig.onModuleInit();
+    }).toThrow(/Invalid side effect "nonExistentSideEffect" defined in workflow configuration transitions/);
+
+    jest.restoreAllMocks();
+  });
 });

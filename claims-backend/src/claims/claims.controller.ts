@@ -1,10 +1,13 @@
-import { Controller, Get, Post, Body, Param, HttpStatus, HttpCode } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, HttpStatus, HttpCode, UseGuards } from '@nestjs/common';
 import { ClaimsService } from './claims.service';
-import { CreateClaimDto, TransitionClaimDto } from '../engine/types';
+import { CreateClaimDto, TransitionClaimDto, TriggeredBy } from '../engine/types';
 import { AuditTrailService } from '../engine/audit-trail.service';
 import { WorkflowEngineService } from '../engine/workflow-engine.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { CurrentUser } from '../auth/current-user.decorator';
 
 @Controller('claims')
+@UseGuards(JwtAuthGuard)
 export class ClaimsController {
   constructor(
     private readonly claimsService: ClaimsService,
@@ -18,8 +21,8 @@ export class ClaimsController {
    */
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  async create(@Body() dto: CreateClaimDto) {
-    return await this.claimsService.create(dto);
+  async create(@Body() dto: CreateClaimDto, @CurrentUser() user: TriggeredBy) {
+    return await this.claimsService.create(dto, user);
   }
 
   /**
@@ -61,8 +64,12 @@ export class ClaimsController {
    */
   @Post(':id/transition')
   @HttpCode(HttpStatus.OK)
-  async transition(@Param('id') id: string, @Body() dto: TransitionClaimDto) {
-    return await this.claimsService.transition(id, dto);
+  async transition(
+    @Param('id') id: string,
+    @Body() dto: TransitionClaimDto,
+    @CurrentUser() user: TriggeredBy,
+  ) {
+    return await this.claimsService.transition(id, dto, user);
   }
 
   /**

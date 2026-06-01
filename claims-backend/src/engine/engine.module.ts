@@ -4,9 +4,10 @@ import { WorkflowEngineService } from './workflow-engine.service';
 import { AuditTrailService } from './audit-trail.service';
 import { ClaimEntity } from './entities/claim.entity';
 import { AuditLogEntity } from './entities/audit-log.entity';
+import { UserEntity } from './entities/user.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([ClaimEntity, AuditLogEntity])],
+  imports: [TypeOrmModule.forFeature([ClaimEntity, AuditLogEntity, UserEntity])],
   providers: [WorkflowEngineService, AuditTrailService],
   exports: [TypeOrmModule, WorkflowEngineService, AuditTrailService],
 })

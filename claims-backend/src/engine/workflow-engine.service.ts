@@ -1,13 +1,70 @@
 import { Injectable, BadRequestException, ForbiddenException, OnModuleInit } from '@nestjs/common';
 import { BasePrecondition, Claim, TransitionConfig, TransitionResult, WorkflowConfig, TriggeredBy } from './types';
 import { AuditTrailService } from './audit-trail.service';
-import { ClaimState, PreconditionOperator, MAX_INFO_REQUEST_CYCLES } from './constants';
+import { ClaimState, PreconditionOperator, MAX_INFO_REQUEST_CYCLES, WorkflowSideEffect } from './constants';
 import * as fs from 'fs';
 import * as path from 'path';
 
 @Injectable()
 export class WorkflowEngineService implements OnModuleInit {
   private config!: WorkflowConfig;
+
+  private readonly sideEffectHandlers: Record<
+    WorkflowSideEffect,
+    (claim: Claim, user: TriggeredBy, timestamp: string) => void
+  > = {
+    [WorkflowSideEffect.NOTIFY_ASSESSOR_TEAM]: (claim) => {
+      console.log(
+        ` > \x1b[36mNotification Sent:\x1b[0m Assessor Team alerted of new documents verified for Claim ${claim.claimId}`,
+      );
+    },
+    [WorkflowSideEffect.LOG_ASSESSMENT_START_TIME]: (claim, user, timestamp) => {
+      console.log(
+        ` > \x1b[36mLog Registered:\x1b[0m Assessment timer initiated for Claim ${claim.claimId} at ${timestamp}`,
+      );
+    },
+    [WorkflowSideEffect.NOTIFY_MEMBER_OF_APPROVAL]: (claim) => {
+      console.log(
+        ` > \x1b[36mNotification Sent:\x1b[0m Approval confirmation dispatched to claimant for Claim ${claim.claimId}`,
+      );
+    },
+    [WorkflowSideEffect.CREATE_PAYMENT_REQUEST]: (claim) => {
+      console.log(
+        ` > \x1b[36mSystem Action:\x1b[0m Payment request scheduled in downstream billing queue for Claim ${claim.claimId}`,
+      );
+    },
+    [WorkflowSideEffect.NOTIFY_MEMBER_OF_REJECTION_WITH_APPEAL_INSTRUCTIONS]: (claim) => {
+      console.log(
+        ` > \x1b[36mNotification Sent:\x1b[0m Rejection alert dispatched to member. Reason: "${claim.metadata.rejectionReason}". ` +
+          `Appeal manual delivered.`,
+      );
+    },
+    [WorkflowSideEffect.NOTIFY_MEMBER_OF_MISSING_INFO_REQUEST]: (claim) => {
+      console.log(
+        ` > \x1b[36mNotification Sent:\x1b[0m Missing info request dispatched to member: "${claim.metadata.missingInfoDescription}"`,
+      );
+    },
+    [WorkflowSideEffect.RESET_ASSESSMENT_TIMER]: (claim) => {
+      console.log(
+        ` > \x1b[36mLog Registered:\x1b[0m Assessor review countdown clock reset for Claim ${claim.claimId}`,
+      );
+    },
+    [WorkflowSideEffect.TRIGGER_PAYMENT_SYSTEM]: (claim) => {
+      console.log(
+        ` > \x1b[36mSystem Action:\x1b[0m Bank wire transfer initiated in Payment Gateway for Claim ${claim.claimId}`,
+      );
+    },
+    [WorkflowSideEffect.NOTIFY_MEMBER_WITH_PAYMENT_REFERENCE]: (claim) => {
+      console.log(
+        ` > \x1b[36mNotification Sent:\x1b[0m Reference confirmation wired to member for Claim ${claim.claimId}`,
+      );
+    },
+    [WorkflowSideEffect.ARCHIVE_CLAIM]: () => {
+      console.log(
+        ` > \x1b[36mSystem Action:\x1b[0m Claim data and audit records permanently indexed into regulatory archives.`,
+      );
+    },
+  };
 
   constructor(private readonly auditTrailService: AuditTrailService) {}
 
@@ -19,10 +76,26 @@ export class WorkflowEngineService implements OnModuleInit {
       const configPath = path.join(process.cwd(), 'config', 'workflow-config.json');
       const rawData = fs.readFileSync(configPath, 'utf8');
       this.config = JSON.parse(rawData);
+
+      // Validate that all side effects defined in transitions are valid WorkflowSideEffects
+      const validSideEffects = Object.values(WorkflowSideEffect) as string[];
+      for (const transition of this.config.transitions) {
+        if (transition.sideEffects) {
+          for (const effect of transition.sideEffects) {
+            if (!validSideEffects.includes(effect)) {
+              throw new Error(
+                `Invalid side effect "${effect}" defined in workflow configuration transitions. ` +
+                `Please ensure it matches the WorkflowSideEffect enum in src/engine/constants.ts`,
+              );
+            }
+          }
+        }
+      }
+
       console.log('Workflow configuration successfully loaded.');
     } catch (error) {
       console.error('Failed to load workflow configuration:', error);
-      throw new Error('Workflow configuration initialization failed.');
+      throw new Error(`Workflow configuration initialization failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -196,45 +269,11 @@ export class WorkflowEngineService implements OnModuleInit {
       `on Claim "${claim.claimId}" triggered by User "${user.userId}" (${user.role}).`,
     );
 
-    // Dynamic messaging logs to mimic real downstream activities
-    switch (effectName) {
-      case 'notifyAssessorTeam':
-        console.log(` > \x1b[36mNotification Sent:\x1b[0m Assessor Team alerted of new documents verified for Claim ${claim.claimId}`);
-        break;
-      case 'logAssessmentStartTime':
-        console.log(` > \x1b[36mLog Registered:\x1b[0m Assessment timer initiated for Claim ${claim.claimId} at ${timestamp}`);
-        break;
-      case 'notifyMemberOfApproval':
-        console.log(` > \x1b[36mNotification Sent:\x1b[0m Approval confirmation dispatched to claimant for Claim ${claim.claimId}`);
-        break;
-      case 'createPaymentRequest':
-        console.log(` > \x1b[36mSystem Action:\x1b[0m Payment request scheduled in downstream billing queue for Claim ${claim.claimId}`);
-        break;
-      case 'notifyMemberOfRejectionWithAppealInstructions':
-        console.log(
-          ` > \x1b[36mNotification Sent:\x1b[0m Rejection alert dispatched to member. Reason: "${claim.metadata.rejectionReason}". ` +
-          `Appeal manual delivered.`,
-        );
-        break;
-      case 'notifyMemberOfMissingInfoRequest':
-        console.log(
-          ` > \x1b[36mNotification Sent:\x1b[0m Missing info request dispatched to member: "${claim.metadata.missingInfoDescription}"`,
-        );
-        break;
-      case 'resetAssessmentTimer':
-        console.log(` > \x1b[36mLog Registered:\x1b[0m Assessor review countdown clock reset for Claim ${claim.claimId}`);
-        break;
-      case 'triggerPaymentSystem':
-        console.log(` > \x1b[36mSystem Action:\x1b[0m Bank wire transfer initiated in Payment Gateway for Claim ${claim.claimId}`);
-        break;
-      case 'notifyMemberWithPaymentReference':
-        console.log(` > \x1b[36mNotification Sent:\x1b[0m Reference confirmation wired to member for Claim ${claim.claimId}`);
-        break;
-      case 'archiveClaim':
-        console.log(` > \x1b[36mSystem Action:\x1b[0m Claim data and audit records permanently indexed into regulatory archives.`);
-        break;
-      default:
-        console.log(` > Side effect executor completed successfully.`);
+    const handler = this.sideEffectHandlers[effectName as WorkflowSideEffect];
+    if (handler) {
+      handler(claim, user, timestamp);
+    } else {
+      console.log(` > Side effect executor completed successfully.`);
     }
   }
 }

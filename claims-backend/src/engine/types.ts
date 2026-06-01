@@ -22,9 +22,9 @@ export interface WorkflowConfig {
   transitions: TransitionConfig[];
 }
 
-export interface TriggeredBy {
-  userId: string;
-  role: string;
+export class TriggeredBy {
+  userId!: string;
+  role!: string;
 }
 
 export interface AuditLog {
@@ -53,8 +53,8 @@ export class CreateClaimDto {
 }
 
 export class TransitionClaimDto {
-  role!: string;
-  userId!: string;
+  role?: string;
+  userId?: string;
   toState!: string;
   reason!: string;
   context?: Record<string, any>;

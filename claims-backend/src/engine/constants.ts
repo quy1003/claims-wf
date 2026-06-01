@@ -31,3 +31,15 @@ export enum PreconditionOperator {
 
 export const MAX_INFO_REQUEST_CYCLES = 3;
 
+export enum WorkflowSideEffect {
+  NOTIFY_ASSESSOR_TEAM = 'notifyAssessorTeam',
+  LOG_ASSESSMENT_START_TIME = 'logAssessmentStartTime',
+  NOTIFY_MEMBER_OF_APPROVAL = 'notifyMemberOfApproval',
+  CREATE_PAYMENT_REQUEST = 'createPaymentRequest',
+  NOTIFY_MEMBER_OF_REJECTION_WITH_APPEAL_INSTRUCTIONS = 'notifyMemberOfRejectionWithAppealInstructions',
+  NOTIFY_MEMBER_OF_MISSING_INFO_REQUEST = 'notifyMemberOfMissingInfoRequest',
+  RESET_ASSESSMENT_TIMER = 'resetAssessmentTimer',
+  TRIGGER_PAYMENT_SYSTEM = 'triggerPaymentSystem',
+  NOTIFY_MEMBER_WITH_PAYMENT_REFERENCE = 'notifyMemberWithPaymentReference',
+  ARCHIVE_CLAIM = 'archiveClaim',
+}
