@@ -22,8 +22,10 @@ export class AuditTrailService {
     triggeredBy: TriggeredBy,
     reason: string,
     context: Record<string, any>,
+    entityManager?: any,
   ): Promise<AuditLog> {
-    const logEntry = this.auditLogRepository.create({
+    const repo = entityManager ? entityManager.getRepository(AuditLogEntity) : this.auditLogRepository;
+    const logEntry = repo.create({
       id: crypto.randomUUID(),
       claimId,
       fromState,
@@ -34,7 +36,7 @@ export class AuditTrailService {
       context: context || {},
     });
 
-    const saved = await this.auditLogRepository.save(logEntry);
+    const saved = await repo.save(logEntry);
     
     // Map to DTO, deep freeze, and return to guarantee tamper-resistance
     const mapped = this.mapToDto(saved);

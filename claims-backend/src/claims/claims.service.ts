@@ -50,6 +50,7 @@ export class ClaimsService {
         user,
         'Initial claim submission',
         dto.metadata || {},
+        transactionalEntityManager,
       );
 
       return this.mapToDto(saved);
@@ -103,6 +104,7 @@ export class ClaimsService {
         caller,
         dto.reason,
         dto.context || {},
+        transactionalEntityManager,
       );
 
       // Update the claim entity inside the transaction

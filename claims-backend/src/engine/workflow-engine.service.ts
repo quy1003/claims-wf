@@ -181,6 +181,7 @@ export class WorkflowEngineService implements OnModuleInit {
     triggeredBy: TriggeredBy,
     reason: string,
     context: Record<string, any> = {},
+    entityManager?: any,
   ): Promise<TransitionResult> {
     // 1. Validate transition
     const transitionConfig = this.validateTransition(claim, toState, triggeredBy, context);
@@ -211,6 +212,7 @@ export class WorkflowEngineService implements OnModuleInit {
       triggeredBy,
       reason,
       context,
+      entityManager,
     );
 
     // 4. Run Side Effects (Mock logs to console)
