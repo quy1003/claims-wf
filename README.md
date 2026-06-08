@@ -1,3 +1,4 @@
+# Link trả lời: https://docs.google.com/document/d/1TgrMaG6mwKii_1dQ62ttDy_JnntRIhNF/edit?usp=sharing&ouid=107805113305341217767&rtpof=true&sd=true
 # Claims Workflow Orchestrator (English)
 
 The **Claims Workflow Orchestrator** is a robust, state-of-the-art, config-driven state machine application built with **NestJS** on the backend and **Next.js** on the frontend, using **MySQL** as its persistent database layer. 
